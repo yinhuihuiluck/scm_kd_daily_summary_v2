@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>客单日汇总 · 按采购类型（视图2）</title>
+<style>
+:root{
+  --sidebar-bg:#001529;
+  --sidebar-item:#ffffffb3;
+  --sidebar-item-active:#fff;
+  --primary:#1890ff;
+  --primary-hover:#40a9ff;
+  --primary-active:#096dd9;
+  --primary-weak:rgba(24,144,255,.06);
+  --link:#2362d5;
+  --page-bg:#f0f2f5;
+  --card:#fff;
+  --info-bg:#e6f7ff;
+  --info-border:#91d5ff;
+  --line:#e8e8e8;
+  --line-2:#f0f0f0;
+  --t1:rgba(0,0,0,.85);
+  --t2:rgba(0,0,0,.65);
+  --t3:rgba(0,0,0,.45);
+  --t4:rgba(0,0,0,.25);
+  --radius:4px;
+  --shadow:0 1px 2px rgba(0,0,0,.04);
+  --font:"PingFang SC","Helvetica Neue",Helvetica,"Microsoft YaHei",Arial,sans-serif;
+  --helv:"Helvetica Neue",Helvetica,Arial,sans-serif;
+  --sidebar-w:208px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:var(--font);font-size:14px;color:var(--t1);background:var(--page-bg);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+a{color:inherit;text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;font-size:14px}
+svg{display:block}
+::-webkit-scrollbar{width:8px;height:8px}
+::-webkit-scrollbar-thumb{background:rgba(0,0,0,.18);border-radius:4px}
+::-webkit-scrollbar-thumb:hover{background:rgba(0,0,0,.3)}
+
+/* ============ Layout ============ */
+.app{display:flex;min-height:100vh;align-items:stretch}
+.sidebar{width:var(--sidebar-w);flex:0 0 var(--sidebar-w);background:var(--sidebar-bg);
+  color:var(--sidebar-item);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+  transition:width .2s ease,flex-basis .2s ease;z-index:60}
+.main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;background:var(--page-bg)}
+
+/* ============ Sidebar ============ */
+.brand{height:56px;display:flex;align-items:center;gap:10px;padding:0 16px;flex:0 0 56px;
+  color:#fff;overflow:hidden;white-space:nowrap}
+.brand .logo{width:24px;height:24px;flex:0 0 24px;color:#40a9ff}
+.brand .name{font-size:15px;font-weight:600;letter-spacing:.3px}
+.nav{flex:1 1 auto;overflow-y:auto;overflow-x:hidden;padding:6px 0 16px}
+.nav-item{display:flex;align-items:center;gap:10px;height:40px;padding:0 16px;font-size:14px;
+  color:var(--sidebar-item);white-space:nowrap;cursor:pointer;position:relative;transition:background .15s,color .15s}
+.nav-item .ico{width:16px;height:16px;flex:0 0 16px;color:currentColor;opacity:.95}
+.nav-item .txt{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis}
+.nav-item .arrow{width:12px;height:12px;flex:0 0 12px;transition:transform .2s;opacity:.7}
+.nav-item:hover{color:#fff;background:rgba(255,255,255,.06)}
+.nav-item.active{background:var(--primary);color:#fff}
+.nav-item.active:hover{background:var(--primary)}
+.nav-item.open .arrow{transform:rotate(90deg)}
+.nav-sub{overflow:hidden;max-height:0;transition:max-height .22s ease}
+.nav-sub.show{max-height:200px}
+.nav-sub .nav-item{height:36px;padding-left:44px;font-size:13px}
+
+/* ============ Header ============ */
+.header{background:#fff;box-shadow:var(--shadow);position:sticky;top:0;z-index:40}
+.crumb-row{display:flex;align-items:center;justify-content:space-between;gap:16px;height:48px;padding:0 24px;
+  position:relative;z-index:2;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.crumb{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--t3)}
+.crumb .sep{color:var(--t4)}
+.crumb .cur{color:var(--t2)}
+.user-actions{display:flex;align-items:center;gap:18px;color:var(--t2);font-size:14px}
+.help{display:inline-flex;align-items:center;gap:4px;cursor:pointer}
+.help .chev{display:inline-flex;gap:0;letter-spacing:-4px;font-size:11px;color:var(--t3)}
+.icon-btn{width:28px;height:28px;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--radius);
+  color:var(--t2);transition:background .15s,color .15s}
+.icon-btn:hover{background:rgba(0,0,0,.04);color:var(--t1)}
+.icon-btn[disabled]{opacity:.55;cursor:not-allowed}
+.icon-btn.spinning svg{animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* 刷新时的页面加载动效：内容区半透明遮罩 + 居中旋转圆点，约持续 1 秒 */
+.loading-mask{position:fixed;top:0;right:0;bottom:0;left:var(--sidebar-w);z-index:900;display:none;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.6)}
+body.loading .loading-mask{display:flex}
+.spinner{position:relative;width:36px;height:36px;animation:loaderRotate 1.2s linear infinite}
+.spinner i{position:absolute;width:10px;height:10px;border-radius:50%;background:var(--primary);
+  animation:loaderDot 1s ease-in-out infinite}
+.spinner i:nth-child(1){left:0;top:0}
+.spinner i:nth-child(2){right:0;top:0;animation-delay:.2s}
+.spinner i:nth-child(3){right:0;bottom:0;animation-delay:.4s}
+.spinner i:nth-child(4){left:0;bottom:0;animation-delay:.6s}
+@keyframes loaderRotate{to{transform:rotate(360deg)}}
+@keyframes loaderDot{0%,100%{opacity:.25;transform:scale(.7)}50%{opacity:1;transform:scale(1)}}
+.avatar{display:flex;align-items:center;gap:8px;cursor:pointer;color:var(--t2)}
+.avatar .ph{width:24px;height:24px;border-radius:50%;background:#d9e6f5;color:#5b7a99;
+  display:flex;align-items:center;justify-content:center}
+
+/* 顶部多标签页：浏览器式卡片标签（圆角顶 + 选中实心蓝 + 关闭按钮） */
+.tabstrip{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;height:46px;padding:8px 24px 0}
+.tabstrip .user-actions{align-self:center}
+.tabs{display:flex;align-items:flex-end;gap:6px}
+.tab{position:relative;height:32px;padding:0 14px;display:inline-flex;align-items:center;gap:8px;
+  font-size:13px;color:var(--t2);background:#fff;border:1px solid #d9d9d9;border-bottom:none;
+  border-radius:6px 6px 0 0;white-space:nowrap;
+  transition:height .18s ease,background .15s,color .15s,border-color .15s}
+.tab:hover{color:var(--primary);border-color:#a9d3ff}
+.tab.active{background:var(--primary);color:#fff;border-color:var(--primary);font-weight:500}/* @manual-end */
+.tab.active:hover{background:var(--primary-hover);border-color:var(--primary-hover);color:#fff}
+.tab .tab-close{display:none;width:14px;height:14px;flex:0 0 14px;align-items:center;justify-content:center;
+  border-radius:50%;transition:background .15s}
+.tab.active .tab-close{display:inline-flex}
+.tab.active .tab-close:hover{background:rgba(255,255,255,.3)}
+.divider{height:1px;background:var(--line)}
+
+.title-band{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;background:#fff}
+.title-band h1{font-size:20px;font-weight:600;color:var(--t1)}
+.tenant{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--t1)}
+.tenant .badge{background:rgba(35,98,213,.08);color:var(--link);border:1px solid rgba(35,98,213,.25);
+  border-radius:var(--radius);padding:1px 8px;font-size:12px}
+
+/* ============ Content ============ */
+.content{padding:10px 24px 32px;display:flex;flex-direction:column;gap:10px;min-width:0}
+/* 内容区全屏态：补背景/内边距并允许滚动；其中显示 Esc 退出提示 */
+.content:fullscreen{background:var(--page-bg);padding:16px 24px;overflow:auto}
+.content:-webkit-full-screen{background:var(--page-bg);padding:16px 24px;overflow:auto}
+.fs-hint{display:none;position:fixed;top:16px;right:24px;z-index:1000;align-items:center;gap:6px;
+  background:rgba(0,0,0,.75);color:#fff;font-size:12px;padding:6px 12px;border-radius:var(--radius)}
+.content:fullscreen .fs-hint,.content:-webkit-full-screen .fs-hint{display:inline-flex}
+.card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+/* filter card */
+.filter-card{padding:20px 24px}
+.filter-top{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.seg{display:inline-flex;border-radius:var(--radius);overflow:hidden}
+.seg button{height:32px;padding:0 18px;font-size:14px;color:var(--primary);background:transparent;
+  border:1px solid transparent;transition:all .15s}
+.seg button.sel{background:var(--primary);color:#fff}
+.seg button:not(.sel):hover{color:var(--primary-hover);background:var(--primary-weak)}
+/* @manual-start 不要修改以下样式 */
+.filter-tabs{display:inline-flex;background:#fff;border-radius:var(--radius);border:1px solid var(--primary)}
+.filter-tabs button{height:28px;padding:0 16px;color:var(--primary);font-size:14px}
+/* @manual-end */
+.filter-tabs button.sel{color:#fff;background:var(--primary);box-shadow:0 1px 2px rgba(0,0,0,.08);font-weight:500}
+
+.switch-wrap{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--t2)}
+.switch{position:relative;width:44px;height:22px;border-radius:11px;background:rgba(0,0,0,.25);
+  transition:background .2s;flex:0 0 44px;cursor:pointer}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;
+  background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.switch.on{background:var(--primary)}
+.switch.on::after{left:24px}
+
+.filter-row{display:flex;flex-wrap:wrap;gap:24px 100px;margin-top:18px;align-items:flex-end;}
+.field{display:flex;align-items:center;gap:10px;min-width:0}
+.field > label{font-size:14px;color:var(--t1);white-space:nowrap;text-align:right;width:105px;}
+.field > label.req{display:inline-flex;align-items:center;gap:4px;justify-content: end;}
+.info-i{width:14px;height:14px;color:var(--t3);cursor:pointer;flex:0 0 14px}
+.info-i:hover{color:var(--primary)}
+
+.control{height:32px;min-width:120px;display:inline-flex;align-items:center;gap:6px;padding:0 10px;
+  border:1px solid #d9d9d9;border-radius:var(--radius);background:#fff;font-size:14px;color:var(--t2);
+  transition:border-color .15s,box-shadow .15s;position:relative}
+.control:hover{border-color:var(--primary-hover)}
+.control.focus, .control.open{border-color:var(--primary);box-shadow:0 0 0 2px rgba(24,144,255,.12)}
+.control .val{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.control .caret{width:10px;height:10px;color:var(--t4);flex:0 0 10px;transition:transform .2s}
+.control.open .caret{transform:rotate(180deg);color:var(--primary)}
+
+.dropdown{position:absolute;top:calc(100% + 4px);left:0;min-width:100%;background:#fff;border-radius:var(--radius);
+  box-shadow:0 3px 12px rgba(0,0,0,.14);padding:4px;z-index:30;display:none;max-height:220px;overflow-y:auto}
+.dropdown.show{display:block}
+.dropdown .opt{padding:6px 10px;border-radius:3px;font-size:14px;color:var(--t1);cursor:pointer;white-space:nowrap}
+.dropdown .opt:hover{background:#f5f5f5}
+.dropdown .opt.sel{background:var(--primary-weak);color:var(--primary);font-weight:500}
+
+.daterange{height:32px;display:inline-flex;align-items:center;gap:8px;padding:0 10px;border:1px solid #d9d9d9;
+  border-radius:var(--radius);background:#fff;font-size:14px;color:var(--t4);min-width:280px}
+.daterange:hover{border-color:var(--primary-hover)}
+.daterange .d{flex:1 1 0;text-align:center;white-space:nowrap;cursor:pointer}
+.daterange .d.filled{color:var(--t2)}
+.daterange .arrow{color:var(--t4)}
+.daterange .cal{color:var(--t3);flex:0 0 16px}
+
+.presets{display:inline-flex;border:1px solid #d9d9d9;border-radius:var(--radius);overflow:hidden}
+.presets button{height:30px;padding:0 14px;font-size:14px;color:var(--t2);background:#fff;border-right:1px solid #d9d9d9}
+.presets button:last-child{border-right:none}
+.presets button.sel{background:var(--primary);color:#fff;border-color:var(--primary)}
+.presets button:not(.sel):hover{color:var(--primary)}
+
+.btn{height:32px;padding:0 16px;border-radius:var(--radius);font-size:14px;display:inline-flex;
+  align-items:center;gap:6px;transition:all .15s}
+.btn-default{background:#fff;border:1px solid #d9d9d9;color:var(--t2)}
+.btn-default:hover{color:var(--primary);border-color:var(--primary-hover)}
+.btn-primary{background:var(--primary);border:1px solid var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn-primary:active{background:var(--primary-active)}
+.btn-text{color:var(--primary);padding:0 8px}
+.btn-text:hover{color:var(--primary-hover);background:var(--primary-weak)}
+.actions{margin-left:auto;display:flex;gap:12px;align-items:center}
+
+.tooltip{position:absolute;z-index:50;background:rgba(0,0,0,.8);color:#fff;font-size:13px;line-height:1.55;
+  padding:8px 12px;border-radius:var(--radius);max-width:600px;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.tooltip::after{content:"";position:absolute;bottom:-5px;left:32px;width:10px;height:10px;background:rgba(0,0,0,.8);
+  transform:rotate(45deg)}
+.tooltip[hidden]{display:none}
+
+/* main card */
+.main-card{padding:0 0 0}
+.mc-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px 8px;flex-wrap:wrap}
+.mc-title{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--t1)}
+.mc-title .ico{width:16px;height:16px;color:var(--primary)}
+.mc-title .time{color:var(--t3);font-size:14px}
+.mc-actions{display:flex;align-items:center;gap:6px}
+
+.alert{margin:6px 24px 0;background:var(--info-bg);border:1px solid var(--info-border);border-radius:var(--radius);
+  padding:8px 12px;display:flex;align-items:flex-start;gap:8px;font-size:14px;color:var(--t2)}
+.alert .ai{width:16px;height:16px;flex:0 0 16px;color:var(--primary);margin-top:1px}
+.alert .at{flex:1 1 auto}
+.alert .ax{width:18px;height:18px;flex:0 0 18px;display:flex;align-items:center;justify-content:center;
+  color:var(--t3);border-radius:2px;cursor:pointer}
+.alert .ax:hover{background:rgba(0,0,0,.06);color:var(--t1)}
+
+.table-wrap{margin-top:16px;overflow-x:auto}
+table.grid{width:100%;border-collapse:collapse;font-size:14px;min-width:820px}
+table.grid th{color:var(--t1);font-weight:500;text-align:left;padding:10px 16px;border-bottom:1px solid var(--line);
+  white-space:nowrap;background:#fafafa}
+table.grid th .th{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+table.grid th .sort{width:12px;height:12px;color:var(--t4);flex:0 0 12px}
+table.grid th.sorted .sort{color:var(--primary)}
+table.grid td{padding:10px 16px;border-bottom:1px solid var(--line-2);color:var(--t1);white-space:nowrap}
+table.grid td.num{font-family:var(--helv);font-variant-numeric:tabular-nums}
+table.grid tbody tr{transition:background .15s}
+table.grid tbody tr:hover{background:var(--primary-weak)}
+table.grid tbody tr.hl{background:var(--primary-weak)}
+table.grid td.col-idx{color:var(--t1);text-align:center;width:64px}
+table.grid td.cell-strong{color:var(--t1);font-weight:500}
+table.grid tfoot td{padding:12px 16px;color:var(--t1);font-weight:500;border-bottom:none}
+.wow{display:inline-flex;align-items:center;gap:4px;font-family:var(--helv)}
+.wow .ar{font-size:11px;line-height:1}
+.wow.up{color:#f5222d}
+.wow.down{color:#52c41a}
+
+.charts{display:grid;grid-template-columns:minmax(0,509fr) minmax(0,580fr);gap:16px;padding:16px 24px 8px}
+@media(max-width:900px){.charts{grid-template-columns:1fr}}
+.chart-card{border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px 8px;min-width:0}
+.chart-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.chart-head h3{font-size:18px;font-weight:600;color:var(--t1)}
+.chart-tools{display:flex;align-items:center;gap:10px}
+.chart-tabs{display:inline-flex;gap:2px}
+.chart-tabs button{height:26px;padding:0 10px;font-size:14px;color:var(--t2);border-radius:3px}
+.chart-tabs button.sel{color:var(--primary)}
+.chart-tabs button:hover{color:var(--primary-hover)}
+.chart-sub{font-size:14px;color:var(--t3);margin-top:6px}
+.chart-body{margin-top:8px}
+.chart-body svg{width:100%;height:auto;display:block}
+
+.legend-inline{display:flex;gap:16px;justify-content:flex-end;font-size:12px;color:var(--t1);margin-top:-6px}
+.legend-inline span{display:inline-flex;align-items:center;gap:6px}
+.legend-inline i{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+.foot-note{padding:8px 24px 20px;border-top:1px solid var(--line-2);margin-top:8px}
+.foot-note .t{color:var(--t3);font-size:14px;margin:14px 0 6px}
+.foot-note ol{color:var(--t3);font-size:14px;line-height:1.9;padding-left:18px}
+
+.copyright{text-align:center;color:var(--t3);font-size:14px;padding:24px 0 8px}
+
+/* toast */
+.toast-layer{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:999;display:flex;
+  flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{background:#fff;box-shadow:0 6px 20px rgba(0,0,0,.16);border-radius:var(--radius);padding:9px 16px;
+  font-size:14px;color:var(--t1);display:flex;align-items:center;gap:8px;animation:tin .2s ease}
+.toast .ti{width:16px;height:16px;color:var(--primary)}
+@keyframes tin{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+/* responsive */
+/* 侧边栏收起/展开按钮 */
+.side-toggle{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;flex:0 0 26px;
+  margin-right:4px;border-radius:var(--radius);color:var(--t2);cursor:pointer;transition:background .15s,color .15s}
+.side-toggle:hover{background:rgba(0,0,0,.05);color:var(--t1)}
+.side-toggle svg{transition:transform .25s ease}
+/* 折叠态（由 crumb-row 图标切换） */
+.app.collapsed{--sidebar-w:64px}
+.app.collapsed .brand{padding:0 20px}
+.app.collapsed .brand .name{display:none}
+.app.collapsed .nav-item{padding:0 24px}
+.app.collapsed .nav-item .txt,.app.collapsed .nav-item .arrow{display:none}
+.app.collapsed .nav-sub{display:none}
+.app.collapsed .side-toggle svg{transform:scaleX(-1)}
+.app.collapsed .nav-item::after{content:attr(data-title);position:absolute;left:60px;background:rgba(0,0,0,.8);color:#fff;
+  font-size:12px;padding:4px 8px;border-radius:4px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s}
+.app.collapsed .nav-item:hover::after{opacity:1}
+@media(max-width:1280px){
+  :root{--sidebar-w:64px}
+  .brand{padding:0 20px}
+  .brand .name{display:none}
+  .nav-item{padding:0 24px}
+  .nav-item .txt,.nav-item .arrow{display:none}
+  .nav-sub{display:none}
+  .nav-item::after{content:attr(data-title);position:absolute;left:60px;background:rgba(0,0,0,.8);color:#fff;
+    font-size:12px;padding:4px 8px;border-radius:4px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s}
+  .nav-item:hover::after{opacity:1}
+}
+@media(max-width:992px){
+  .crumb-row,.tabstrip,.title-band,.content,.mc-head,.charts,.foot-note{padding-left:16px;padding-right:16px}
+  .filter-row{gap:16px}
+  .actions{margin-left:0;width:100%;justify-content:flex-end}
+}
+@media(max-width:768px){
+  .charts{grid-template-columns:1fr}
+  .filter-row{flex-direction:column;align-items:stretch;gap:12px}
+  .field{justify-content:flex-start}
+  .control,.daterange{min-width:0;width:100%}
+  .daterange{min-width:0}
+  .filter-top{gap:12px}
+}
+@media print{
+  .sidebar,.user-actions,.mc-actions,.filter-card,.tabstrip,.toast-layer{display:none!important}
+  body,.main,.content{background:#fff}
+  .card,.chart-card{box-shadow:none;border:1px solid #ddd}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ================= Sidebar ================= -->
+  <aside class="sidebar">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18" stroke-width="1.2"/>
+        <path d="M7.5 9c1.6 1.6 7.4 1.6 9 0M7.5 15c1.6-1.6 7.4-1.6 9 0" stroke-width="1.2"/>
+      </svg>
+      <span class="name">校能智慧食堂</span>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-item has-sub open" data-title="工作台">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span class="txt">工作台</span>
+        <svg class="arrow" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4.5 2.5 8 6l-3.5 3.5"/></svg>
+      </div>
+      <div class="nav-sub show">
+        <div class="nav-item" data-title="数据概览"><span class="txt">数据概览</span></div>
+      </div>
+      <div class="nav-item" data-title="通知公告">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+        <span class="txt">通知公告</span>
+      </div>
+      <div class="nav-item" data-title="客户订单">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 13h6M9 17h6"/></svg>
+        <span class="txt">客户订单</span>
+      </div>
+      <div class="nav-item" data-title="招标报价">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l9 5v8l-9 5-9-5V8z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>
+        <span class="txt">招标报价</span>
+      </div>
+      <div class="nav-item" data-title="进销管理">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7h13l-3-3"/><path d="M20 17H7l3 3"/></svg>
+        <span class="txt">进销管理</span>
+      </div>
+      <div class="nav-item" data-title="送货对账">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="17" rx="2"/><path d="M9 3v3h6V3M8.5 12l2 2 4-4"/></svg>
+        <span class="txt">送货对账</span>
+      </div>
+      <div class="nav-item active" data-title="客单日汇总">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V10M10 20V4M16 20v-7M22 20V8"/></svg>
+        <span class="txt">客单日汇总</span>
+      </div>
+      <div class="nav-item" data-title="修改密码">
+        <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+        <span class="txt">修改密码</span>
+      </div>
+    </nav>
+  </aside>
+
+  <!-- ================= Main ================= -->
+  <div class="main">
+    <header class="header">
+      <div class="crumb-row">
+        <div class="crumb">
+          <button class="side-toggle" id="sideToggle" title="收起侧边栏" aria-label="收起或展开侧边栏">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h16"/></svg>
+          </button>
+          <span>首页</span><span class="sep">/</span><span class="cur">送货对账</span>
+        </div>
+        <div class="user-actions">
+          <span class="help">帮助 <span class="chev">»</span></span>
+          <span class="icon-btn" title="搜索">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m16.5 16.5 4 4"/></svg>
+          </span>
+          <span class="avatar" title="李小琳">
+            <span class="ph"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.2-4 5.9-5 7.5-5s6.3 1 7.5 5"/></svg></span>
+            <span>李小琳</span>
+          </span>
+          <span class="icon-btn" title="更多">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><circle cx="12" cy="5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="19" r="1.7"/></svg>
+          </span>
+        </div>
+      </div>
+
+      <div class="tabstrip">
+        <div class="tabs" id="topTabs">
+          <button class="tab" data-tab="工作台" title="工作台">工作台<span class="tab-close" data-close title="关闭"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button>
+          <button class="tab" data-tab="通知公告" title="通知公告">通知公告<span class="tab-close" data-close title="关闭"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button>
+          <button class="tab active" data-tab="客单日汇总" title="客单日汇总">客单日汇总<span class="tab-close" data-close title="关闭"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></span></button>
+        </div>
+        <div class="user-actions">
+          <button class="icon-btn" id="btnRefresh" title="刷新">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg>
+          </button>
+          <button class="icon-btn" id="btnFullscreen" title="全屏">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="divider"></div>
+
+    </header>
+
+    <div class="title-band">
+      <h1>客单日汇总</h1>
+      <div class="tenant">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#f5a623" stroke-width="1.8"><path d="M4 21V6l8-3 8 3v15"/><path d="M9 21v-5h6v5M9 9h.01M15 9h.01M9 12h.01M15 12h.01"/></svg>
+        <span>深圳能源电力有限公司</span>
+        <span class="badge">客户</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="fs-hint">按 Esc 键退出全屏</div>
+      <div class="loading-mask" id="loadingMask" aria-hidden="true"><span class="spinner"><i></i><i></i><i></i><i></i></span></div>
+
+      <!-- ============ Filter card ============ -->
+      <section class="card filter-card">
+        <div class="filter-top">
+          <div class="filter-tabs" id="viewTabs">
+            <button data-view="qty">按订货数量汇总</button>
+            <button data-view="type" class="sel">按采购类型汇总</button>
+          </div>
+          <label class="switch-wrap">
+            <span>显示采购类型汇总数据图表</span>
+            <span class="switch on" id="chartSwitch" role="switch" aria-checked="true" tabindex="0"></span>
+          </label>
+        </div>
+
+        <div class="filter-row">
+          <div class="field">
+            <label>分公司( 区域 ) ：</label>
+            <div class="control" id="ddRegion" data-dd style="min-width:180px">
+              <span class="val">深圳区</span>
+              <svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4l3 3 3-3"/></svg>
+              <div class="dropdown">
+                <div class="opt sel">深圳区</div>
+                <div class="opt">福田区</div>
+                <div class="opt">南山区</div>
+                <div class="opt">宝安区</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="field" style="position:relative">
+            <label class="req">送货日期
+              <svg class="info-i" id="infoIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>
+            </label>
+            <div class="daterange" id="dateRange">
+              <span class="d" id="dStart">开始日期</span>
+              <span class="arrow">→</span>
+              <span class="d" id="dEnd">结束日期</span>
+              <svg class="cal" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+            </div>
+            <div class="presets" id="presets">
+              <button data-preset="custom">自定义</button>
+              <button data-preset="today">今天</button>
+              <button data-preset="week" class="sel">本周</button>
+              <button data-preset="month">本月</button>
+            </div>
+            <div class="tooltip" id="dateTip" hidden style="left:58px;bottom:40px">
+              送货日期范围指的是客户订单中的到货日期，例如：客户在1月20号提交了一个1月25号的采购订货单据，那么这个单据的创建时间是1月20号，到货日期为1月25号。
+            </div>
+          </div>
+        </div>
+
+        <div class="filter-row">
+          <div class="field">
+            <label>采购类型：</label>
+            <div class="control" id="ddType" data-dd style="min-width:180px">
+              <span class="val">（AJ）精品蔬菜类</span>
+              <svg class="caret" viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4l3 3 3-3"/></svg>
+              <div class="dropdown">
+                <div class="opt sel">（AJ）精品蔬菜类</div>
+                <div class="opt">(B) 鲜肉类</div>
+                <div class="opt">(AJ) 基地菜</div>
+                <div class="opt">(AY) 有机蔬菜</div>
+                <div class="opt">(K) 水果类</div>
+                <div class="opt">(E) 酱菜类</div>
+              </div>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-default" id="btnReset">重 置</button>
+            <button class="btn btn-primary" id="btnSearch">查 询</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ Main card ============ -->
+      <section class="card main-card">
+        <div class="mc-head">
+          <div class="mc-title">
+            <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V10M10 20V4M16 20v-7M22 20V8"/></svg>
+            <span id="viewTitle">采购类型汇总视图</span>
+            <span class="time" id="viewTime">数据时间：2024/06/18 - 2024/06/25</span>
+          </div>
+          <div class="mc-actions">
+            <button class="btn btn-text" id="btnExportLog">导出记录</button>
+            <button class="btn btn-default" id="btnExport">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 19h14"/></svg>
+              导出
+            </button>
+            <button class="btn btn-default" id="btnPrint">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M7 9V3h10v6"/><rect x="4" y="9" width="16" height="8" rx="2"/><path d="M7 17h10v4H7z"/></svg>
+              打印
+            </button>
+          </div>
+        </div>
+
+        <div class="alert" id="alertBox">
+          <svg class="ai" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01" stroke="#fff" stroke-width="1.8" fill="none"/></svg>
+          <span class="at" id="alertText">采购类型汇总统计的范围是送货日期内供应商已配送的客户订单数据，不包含退货数据。</span>
+          <span class="ax" id="alertClose" title="关闭">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+          </span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="grid" id="dataTable">
+            <thead>
+              <tr>
+                <th class="col-idx"><span class="th" style="cursor:default">序号</span></th>
+                <th data-sort="type"><span class="th">采购类型
+                  <svg class="sort" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2v8M3 7l3 3 3-3"/></svg></span></th>
+                <th data-sort="qty"><span class="th">订货数量
+                  <svg class="sort" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2v8M3 7l3 3 3-3"/></svg></span></th>
+                <th data-sort="amount"><span class="th">非税合计（元）
+                  <svg class="sort" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2v8M3 7l3 3 3-3"/></svg></span></th>
+                <th data-sort="wow"><span class="th">周环比
+                  <svg class="sort" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2v8M3 7l3 3 3-3"/></svg></span></th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+            <tfoot>
+              <tr><td class="col-idx"></td><td>采购总计：</td><td class="num">—</td><td class="num" id="grandTotal">102,520.55</td><td class="num">—</td></tr>
+            </tfoot>
+          </table>
+        </div>
+
+        <div class="charts" id="charts">
+          <!-- Donut -->
+          <div class="chart-card">
+            <div class="chart-head">
+              <h3>采购额类别占比</h3>
+              <div class="chart-tools">
+                <div class="chart-tabs" data-period-group="donut">
+                  <button data-period="today">今天</button>
+                  <button data-period="week" class="sel">本周</button>
+                  <button data-period="month">本月</button>
+                </div>
+                <span class="icon-btn" title="刷新">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg>
+                </span>
+                <span class="icon-btn" title="更多">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/></svg>
+                </span>
+              </div>
+            </div>
+            <div class="chart-sub" id="donutSub">本周: 06/18 - 06/25</div>
+            <div class="chart-body"><div id="donut"></div></div>
+          </div>
+
+          <!-- Bars -->
+          <div class="chart-card">
+            <div class="chart-head">
+              <h3>采购额对比</h3>
+              <div class="chart-tools">
+                <div class="chart-tabs" data-period-group="bar">
+                  <button data-period="today" class="sel">今天</button>
+                  <button data-period="week">本周</button>
+                  <button data-period="month">本月</button>
+                </div>
+                <span class="icon-btn" title="刷新">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v4h-4"/></svg>
+                </span>
+                <span class="icon-btn" title="更多">
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><circle cx="6" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18" cy="12" r="1.6"/></svg>
+                </span>
+              </div>
+            </div>
+            <div class="chart-sub" id="barSub">今天: 06/18</div>
+            <div class="chart-body">
+              <div class="legend-inline"><span><i style="background:#5b8ff9"></i>今日</span><span><i style="background:#95de64"></i>昨日</span></div>
+              <div id="bars"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="foot-note" id="footNote">
+          <div class="t">报表查询和导出说明</div>
+          <ol>
+            <li>报表统计数据来源为审核通过后的单据计入，未通过审核的单据不在统计之列；</li>
+            <li>建议两次导出的时间间隔保持在5分钟以上，避免频繁导出造成服务器资源浪费；</li>
+            <li>我们将为您保留7天内导出的数据，便于您随时导出；</li>
+            <li>导出所用时长与导出数据量的大小有关，请耐心等待；</li>
+            <li>诸如明明细类、分类类等数据量较大的交叉报表，支持导出最大时间跨度为1年的数据，数据量过大可能影响性能，建议分批次导出；</li>
+          </ol>
+        </div>
+      </section>
+
+      <div class="copyright">Copyright © 2024 上海永愉创高版权所有.</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-layer" id="toastLayer"></div>
+
+<script>
+(function(){
+  "use strict";
+  var el = function(id){ return document.getElementById(id); };
+
+  /* ---------- data ---------- */
+  var ROWS = [
+    { type:'(B) 鲜肉类',    qty:3200,    amount:23200.58, wow:126 },
+    { type:'(AJ) 基地菜',   qty:1768.92, amount:31500,    wow:10  },
+    { type:'(AJ) 精品蔬菜', qty:2275,    amount:18650.97, wow:20  },
+    { type:'(AY) 有机蔬菜', qty:3810,    amount:10546,    wow:-8  },
+    { type:'(K) 水果类',    qty:1236,    amount:8898,     wow:69  },
+    { type:'(E) 酱菜类',    qty:5004,    amount:9725,     wow:-23 }
+  ];
+  var CAT_COLOR = {
+    '基地菜':'#1677ff','鲜肉类':'#13c2c2','有机蔬菜':'#52c41a',
+    '精品蔬菜':'#faad14','酱菜类':'#ff4d4f','水果类':'#722ed1'
+  };
+  var DONUT = {
+    today:[{n:'基地菜',v:2768.92},{n:'鲜肉类',v:1500.58},{n:'有机蔬菜',v:743},{n:'精品蔬菜',v:1200},{n:'酱菜类',v:704},{n:'水果类',v:479}],
+    week:[{n:'基地菜',v:31500},{n:'鲜肉类',v:23200.58},{n:'有机蔬菜',v:10546},{n:'精品蔬菜',v:18650.97},{n:'酱菜类',v:9725},{n:'水果类',v:8898}],
+    month:[{n:'基地菜',v:126000},{n:'鲜肉类',v:92802},{n:'有机蔬菜',v:42184},{n:'精品蔬菜',v:74604},{n:'酱菜类',v:38900},{n:'水果类',v:35592}]
+  };
+  var BARS = {
+    today:{ cats:['鲜肉类','基地菜','精品蔬菜','有机蔬菜','水果类','酱菜类'],
+            today:[1500.58,2768.92,1200,743,479,704], yst:[1139.62,2098,937.92,1750,200,345] },
+    week:{  cats:['鲜肉类','基地菜','精品蔬菜','有机蔬菜','水果类','酱菜类'],
+            today:[23200.58,31500,18650.97,10546,8898,9725], yst:[21100,28900,17300,11200,7600,10100] },
+    month:{ cats:['鲜肉类','基地菜','精品蔬菜','有机蔬菜','水果类','酱菜类'],
+            today:[92802,126000,74604,42184,35592,38900], yst:[88400,118000,71200,40200,33900,37600] }
+  };
+  var PERIOD_LABEL = { today:'今天', week:'本周', month:'本月' };
+  var PERIOD_SUB = { today:'今天: 06/18', week:'本周: 06/18 - 06/25', month:'本月: 06/01 - 06/25' };
+  var PRESET_RANGE = { today:['2024/06/18','2024/06/18'], week:['2024/06/18','2024/06/25'], month:['2024/06/01','2024/06/25'] };
+
+  var state = { view:'type', sortKey:null, sortDir:'asc', donutPeriod:'week', barPeriod:'today',
+                chartsOn:true, preset:'week', showTip:true };
+
+  var fmt = function(n,dec){ return Number(n).toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec}); };
+
+  /* ---------- toast ---------- */
+  function toast(msg){
+    var box = document.createElement('div'); box.className='toast';
+    box.innerHTML = '<svg class="ti" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9" stroke="#fff" stroke-width="2" fill="none"/></svg><span></span>';
+    box.lastChild.textContent = msg;
+    el('toastLayer').appendChild(box);
+    setTimeout(function(){ box.style.transition='opacity .3s'; box.style.opacity='0';
+      setTimeout(function(){ box.remove(); },320); }, 1800);
+  }
+
+  /* ---------- table ---------- */
+  function sortedRows(){
+    var rows = ROWS.slice();
+    if(state.sortKey){
+      var k = state.sortKey, d = state.sortDir==='asc'?1:-1;
+      rows.sort(function(a,b){
+        var x=a[k], y=b[k];
+        if(typeof x==='string') return x.localeCompare(y,'zh')*d;
+        return (x-y)*d;
+      });
+    }
+    return rows;
+  }
+  function renderTable(){
+    var rows = sortedRows(), tb = el('tableBody'), html='';
+    rows.forEach(function(r,i){
+      var up = r.wow>=0;
+      var hl = (state.view==='type' && r.type.indexOf('精品蔬菜')>-1);
+      html += '<tr class="'+(hl?'hl':'')+'">'
+        + '<td class="col-idx">'+(i+1)+'</td>'
+        + '<td>' + r.type + '</td>'
+        + '<td class="num' + (state.view==='qty'?' cell-strong':'') + '">' + fmt(r.qty, Number.isInteger(r.qty)?0:2) + '</td>'
+        + '<td class="num' + (state.view==='type'?' cell-strong':'') + '">' + fmt(r.amount,2) + '</td>'
+        + '<td class="num"><span class="wow '+(up?'up':'down')+'">'+ (up?'':'') + r.wow + '%'
+        + '<span class="ar">'+(up?'↑':'↓')+'</span></span></td>'
+        + '</tr>';
+    });
+    tb.innerHTML = html;
+    var total = ROWS.reduce(function(s,r){ return s + r.amount; },0);
+    el('grandTotal').textContent = fmt(total,2);
+    var ths = el('dataTable').querySelectorAll('th[data-sort]');
+    for(var i=0;i<ths.length;i++){
+      ths[i].classList.toggle('sorted', ths[i].getAttribute('data-sort')===state.sortKey);
+    }
+  }
+
+  /* ---------- donut ---------- */
+  function renderDonut(){
+    var data = DONUT[state.donutPeriod], total = data.reduce(function(s,d){return s+d.v;},0);
+    var W=509,H=330,cx=W/2,cy=H/2,sw=34,inner=110,outer=inner+sw/2;
+    var padText=112, padElbow=120;                 /* 标签文字列 / 引导线转折点 */
+    var textL=padText, textR=W-padText, elbowL=padElbow, elbowR=W-padElbow;
+    var cir = 2*Math.PI*inner;
+    var start = -90, segs=[], acc=0;
+    data.forEach(function(d){
+      var frac = d.v/total;
+      segs.push({ n:d.n, v:d.v, frac:frac, a0:start+acc*360, mid:start+(acc+frac/2)*360 });
+      acc += frac;
+    });
+    var svg = '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+    svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+inner+'" fill="none" stroke="#f0f0f0" stroke-width="'+sw+'"/>';
+    segs.forEach(function(s){
+      var len = s.frac*cir;
+      svg += '<circle cx="'+cx+'" cy="'+cy+'" r="'+inner+'" fill="none" stroke="'+CAT_COLOR[s.n]+'"'
+          +  ' stroke-width="'+sw+'" stroke-dasharray="'+len.toFixed(2)+' '+(cir-len).toFixed(2)+'"'
+          +  ' transform="rotate('+s.a0.toFixed(2)+' '+cx+' '+cy+')" stroke-linecap="butt"/>';
+    });
+    /* ---- callout labels: 固定左/右文字列 + 肘形引导线，文字互不重叠 ---- */
+    var left=[], right=[];
+    segs.forEach(function(s){
+      var rad = s.mid*Math.PI/180;
+      var px=cx+Math.cos(rad)*outer, py=cy+Math.sin(rad)*outer;
+      (Math.cos(rad)>=0?right:left).push({ s:s, px:px, py:py, ty:py });
+    });
+    function layout(list){
+      var gap=40, minY=26, maxY=H-32, i;
+      list.sort(function(a,b){ return a.py-b.py; });
+      for(i=1;i<list.length;i++){
+        if(list[i].ty < list[i-1].ty+gap) list[i].ty = list[i-1].ty+gap;
+      }
+      if(list.length && list[list.length-1].ty > maxY){
+        var shift = list[list.length-1].ty - maxY;
+        for(i=list.length-1;i>=0;i--){ list[i].ty -= shift; if(list[i].ty < minY) list[i].ty = minY; }
+      }
+    }
+    layout(left); layout(right);
+    function draw(list, side){
+      list.forEach(function(it){
+        var isRight = side>0;
+        var ex = isRight ? elbowR : elbowL;      /* 引导线转折点，始终位于圆环之外 */
+        var tx = isRight ? textR : textL;        /* 文字列，锚点朝圆环内侧 */
+        var anchor = isRight ? 'start' : 'end';
+        svg += '<polyline points="'+it.px.toFixed(1)+','+it.py.toFixed(1)+' '
+            +  ex.toFixed(1)+','+it.ty.toFixed(1)+' '+tx.toFixed(1)+','+it.ty.toFixed(1)+'"'
+            +  ' fill="none" stroke="#d9d9d9" stroke-width="1"/>';
+        svg += '<circle cx="'+it.px.toFixed(1)+'" cy="'+it.py.toFixed(1)+'" r="2" fill="'+CAT_COLOR[it.s.n]+'"/>';
+        svg += '<text x="'+tx.toFixed(1)+'" y="'+(it.ty-5).toFixed(1)+'" text-anchor="'+anchor+'" font-size="12" fill="#000">'+it.s.n+'</text>';
+        svg += '<text x="'+tx.toFixed(1)+'" y="'+(it.ty+13).toFixed(1)+'" text-anchor="'+anchor+'" font-size="12" fill="#000">￥'+fmt(it.s.v,2)+'</text>';
+      });
+    }
+    draw(left,-1); draw(right,1);
+    svg += '<text x="'+cx+'" y="'+(cy-12)+'" text-anchor="middle" font-size="14" fill="rgba(0,0,0,.45)">采购额</text>';
+    svg += '<text x="'+cx+'" y="'+(cy+24)+'" text-anchor="middle" font-size="24" font-family="Helvetica Neue,Helvetica,Arial" fill="rgba(0,0,0,.85)">￥ '+fmt(total,2)+'</text>';
+    svg += '</svg>';
+    el('donut').innerHTML = svg;
+    el('donutSub').textContent = PERIOD_SUB[state.donutPeriod];
+  }
+
+  /* ---------- bars ---------- */
+  function renderBars(){
+    var d = BARS[state.barPeriod];
+    var W=580,H=300,ml=52,mr=50,mt=22,mb=46;
+    var pw=W-ml-mr, ph=H-mt-mb;
+    var max = 0; d.today.concat(d.yst).forEach(function(v){ if(v>max) max=v; });
+    var step = Math.pow(10, Math.floor(Math.log10(max/4)));
+    var top = Math.ceil(max/ (step) ) * step; while(top - max < step*0.4){ top += step; }
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">';
+    var ticks=6;
+    for(var t=0;t<=ticks;t++){
+      var y = mt + ph - (ph*t/ticks);
+      svg += '<line x1="'+ml+'" y1="'+y.toFixed(1)+'" x2="'+(ml+pw)+'" y2="'+y.toFixed(1)+'" stroke="#f0f0f0"/>';
+      svg += '<text x="'+(ml-10)+'" y="'+(y+4).toFixed(1)+'" text-anchor="end" font-size="12" fill="rgba(0,0,0,.45)">'+fmt(Math.round(top*t/ticks),0)+'</text>';
+    }
+    var n = d.cats.length, groupW = pw/n, barW = Math.min(18, groupW/2.6), gap=4;
+    d.cats.forEach(function(c,i){
+      var gx = ml + groupW*i + groupW/2;
+      var vT = d.today[i], vY = d.yst[i];
+      var hT = ph*vT/top, hY = ph*vY/top;
+      var xT = gx - barW - gap/2, xY = gx + gap/2;
+      svg += '<rect x="'+xT.toFixed(1)+'" y="'+(mt+ph-hT).toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+hT.toFixed(1)+'" rx="1.5" fill="#5b8ff9"/>';
+      svg += '<rect x="'+xY.toFixed(1)+'" y="'+(mt+ph-hY).toFixed(1)+'" width="'+barW.toFixed(1)+'" height="'+hY.toFixed(1)+'" rx="1.5" fill="#95de64"/>';
+      svg += '<text x="'+xT.toFixed(1)+'" y="'+(mt+ph-hT-5).toFixed(1)+'" text-anchor="middle" font-size="11" fill="#000">'+fmt(vT,0)+'</text>';
+      svg += '<text x="'+(xY+barW).toFixed(1)+'" y="'+(mt+ph-hY-5).toFixed(1)+'" text-anchor="middle" font-size="11" fill="#000">'+fmt(vY,0)+'</text>';
+      svg += '<text x="'+gx.toFixed(1)+'" y="'+(mt+ph+18)+'" text-anchor="middle" font-size="12" fill="#000">'+c+'</text>';
+    });
+    svg += '<line x1="'+ml+'" y1="'+(mt+ph)+'" x2="'+(ml+pw)+'" y2="'+(mt+ph)+'" stroke="#e8e8e8"/>';
+    svg += '</svg>';
+    el('bars').innerHTML = svg;
+    el('barSub').textContent = PERIOD_SUB[state.barPeriod];
+  }
+
+  /* ---------- filter interactions ---------- */
+  var viewTitles = { type:'采购类型汇总视图', qty:'订货数量汇总视图' };
+  var alertTexts = {
+    type:'采购类型汇总统计的范围是送货日期内供应商已配送的客户订单数据，不包含退货数据。',
+    qty:'订货数量汇总统计的范围是送货日期内供应商已配送的客户订单数据，不包含退货数据。'
+  };
+  function setView(v){
+    state.view = v;
+    var btns = el('viewTabs').querySelectorAll('button');
+    for(var i=0;i<btns.length;i++) btns[i].classList.toggle('sel', btns[i].getAttribute('data-view')===v);
+    el('viewTitle').textContent = viewTitles[v];
+    el('alertText').textContent = alertTexts[v];
+    renderTable();
+    toast(v==='type'?'已切换到「按采购类型汇总」':'已切换到「按订货数量汇总」');
+  }
+  el('viewTabs').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-view]'); if(b) setView(b.getAttribute('data-view'));
+  });
+
+  /* switch */
+  var sw = el('chartSwitch');
+  function setSwitch(on){
+    state.chartsOn = on;
+    sw.classList.toggle('on', on);
+    sw.setAttribute('aria-checked', on?'true':'false');
+    el('charts').style.display = on?'':'none';
+    if(!on) el('footNote').style.display = ''; 
+  }
+  sw.addEventListener('click', function(){ setSwitch(!state.chartsOn); });
+  sw.addEventListener('keydown', function(e){ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); setSwitch(!state.chartsOn); } });
+
+  /* dropdowns */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-dd]'), function(dd){
+    var ctrl = dd, menu = dd.querySelector('.dropdown');
+    ctrl.addEventListener('click', function(e){
+      e.stopPropagation();
+      var open = ctrl.classList.contains('open');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-dd]'), function(o){ o.classList.remove('open'); o.querySelector('.dropdown').classList.remove('show'); });
+      if(!open){ ctrl.classList.add('open'); menu.classList.add('show'); }
+    });
+    menu.addEventListener('click', function(e){
+      var opt = e.target.closest('.opt'); if(!opt) return;
+      menu.querySelectorAll('.opt').forEach(function(o){ o.classList.remove('sel'); });
+      opt.classList.add('sel');
+      ctrl.querySelector('.val').textContent = opt.textContent;
+      ctrl.classList.remove('open'); menu.classList.remove('show');
+      toast('已选择：'+opt.textContent);
+    });
+  });
+  document.addEventListener('click', function(){
+    Array.prototype.forEach.call(document.querySelectorAll('[data-dd]'), function(o){ o.classList.remove('open'); o.querySelector('.dropdown').classList.remove('show'); });
+  });
+
+  /* presets */
+  el('presets').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-preset]'); if(!b) return;
+    var p = b.getAttribute('data-preset');
+    state.preset = p;
+    this.querySelectorAll('button').forEach(function(x){ x.classList.remove('sel'); });
+    b.classList.add('sel');
+    if(p==='custom'){
+      el('dStart').textContent='开始日期'; el('dEnd').textContent='结束日期';
+      el('dStart').classList.remove('filled'); el('dEnd').classList.remove('filled');
+      el('viewTime').textContent='数据时间：请选择日期范围';
+      toast('请选择自定义日期范围');
+      return;
+    }
+    var r = PRESET_RANGE[p];
+    el('dStart').textContent=r[0]; el('dEnd').textContent=r[1];
+    el('dStart').classList.add('filled'); el('dEnd').classList.add('filled');
+    state.donutPeriod = p; state.barPeriod = (p==='month'?'month':p);
+    syncChartTabs();
+    el('viewTime').textContent='数据时间：'+r[0]+' - '+r[1];
+    renderDonut(); renderBars();
+    toast('已切换数据范围：'+PERIOD_LABEL[p]);
+  });
+  function syncChartTabs(){
+    Array.prototype.forEach.call(document.querySelectorAll('.chart-tabs'), function(g){
+      var key = g.getAttribute('data-period-group');
+      var cur = key==='donut'? state.donutPeriod : state.barPeriod;
+      g.querySelectorAll('button').forEach(function(b){ b.classList.toggle('sel', b.getAttribute('data-period')===cur); });
+    });
+  }
+
+  /* chart period tabs */
+  Array.prototype.forEach.call(document.querySelectorAll('.chart-tabs'), function(g){
+    g.addEventListener('click', function(e){
+      var b = e.target.closest('button[data-period]'); if(!b) return;
+      var key = g.getAttribute('data-period-group'), p = b.getAttribute('data-period');
+      g.querySelectorAll('button').forEach(function(x){ x.classList.remove('sel'); });
+      b.classList.add('sel');
+      if(key==='donut'){ state.donutPeriod=p; renderDonut(); }
+      else{ state.barPeriod=p; renderBars(); }
+    });
+  });
+
+  /* reset / search */
+  el('btnReset').addEventListener('click', function(){
+    document.querySelectorAll('.filter-card .dropdown .opt').forEach(function(o,i){ o.classList.toggle('sel', false); });
+    el('ddRegion').querySelector('.val').textContent='深圳区';
+    el('ddRegion').querySelector('.opt').classList.add('sel');
+    el('ddType').querySelector('.val').textContent='（AJ）精品蔬菜类';
+    el('ddType').querySelector('.opt').classList.add('sel');
+    el('presets').querySelectorAll('button').forEach(function(x){ x.classList.toggle('sel', x.getAttribute('data-preset')==='week'); });
+    state.preset='week'; state.donutPeriod='week'; state.barPeriod='today'; state.sortKey=null;
+    syncChartTabs();
+    var r = PRESET_RANGE.week;
+    el('dStart').textContent=r[0]; el('dEnd').textContent=r[1];
+    el('dStart').classList.add('filled'); el('dEnd').classList.add('filled');
+    el('viewTime').textContent='数据时间：'+r[0]+' - '+r[1];
+    renderTable(); renderDonut(); renderBars();
+    toast('筛选条件已重置');
+  });
+
+  el('btnSearch').addEventListener('click', function(){
+    var btn = this, old = btn.textContent;
+    btn.textContent='查询中…'; btn.disabled=true; btn.style.opacity='.7';
+    el('tableBody').style.opacity='.35';
+    setTimeout(function(){
+      renderTable(); renderDonut(); renderBars();
+      el('tableBody').style.opacity='1';
+      btn.textContent=old; btn.disabled=false; btn.style.opacity='1';
+      toast('查询完成，已更新汇总数据');
+    }, 550);
+  });
+
+  /* sort */
+  el('dataTable').querySelectorAll('th[data-sort]').forEach(function(th){
+    th.addEventListener('click', function(){
+      var k = th.getAttribute('data-sort');
+      if(state.sortKey===k) state.sortDir = state.sortDir==='asc'?'desc':'asc';
+      else{ state.sortKey=k; state.sortDir='asc'; }
+      renderTable();
+      toast('按「'+th.textContent.trim().replace(/\s+/g,'')+'」'+(state.sortDir==='asc'?'升序':'降序')+'排列');
+    });
+  });
+
+  /* alert close */
+  el('alertClose').addEventListener('click', function(){
+    el('alertBox').style.display='none';
+    toast('已关闭提示');
+  });
+
+  /* export / print */
+  el('btnExportLog').addEventListener('click', function(){ toast('打开导出记录（演示）'); });
+  /* 刷新当前页面：图标旋转 + 提示 + 短暂禁用，避免被误认为未刷新而重复点击 */
+  el('btnRefresh').addEventListener('click', function(){
+    var btn = this;
+    if(btn.classList.contains('spinning')) return;
+    btn.classList.add('spinning');
+    btn.disabled = true;
+    toast('正在刷新页面…');
+    document.body.classList.add('loading');
+    try{ sessionStorage.setItem('__pageRefreshing','1'); }catch(e){}
+    setTimeout(function(){ location.reload(); }, 1000);
+  });
+
+  /* 内容区全屏切换（Esc 退出） */
+  el('btnFullscreen').addEventListener('click', function(){
+    var content = document.querySelector('.content');
+    if(document.fullscreenElement || document.webkitFullscreenElement){
+      if(document.exitFullscreen) document.exitFullscreen();
+      else if(document.webkitExitFullscreen) document.webkitExitFullscreen();
+    }else{
+      if(content.requestFullscreen) content.requestFullscreen();
+      else if(content.webkitRequestFullscreen) content.webkitRequestFullscreen();
+      else toast('当前浏览器不支持全屏');
+    }
+  });
+  function syncFsBtn(){
+    var on = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    el('btnFullscreen').title = on ? '退出全屏' : '全屏';
+  }
+  document.addEventListener('fullscreenchange', syncFsBtn);
+  document.addEventListener('webkitfullscreenchange', syncFsBtn);
+
+  el('btnExport').addEventListener('click', function(){ toast('正在导出报表数据…（演示）'); });
+  el('btnPrint').addEventListener('click', function(){ window.print(); });
+
+  /* tooltip */
+  var tip = el('dateTip');
+  function showTip(v){ state.showTip=v; tip.hidden=!v; }
+  showTip(false);            /* 默认隐藏，仅点击信息图标时显示 */
+  el('infoIcon').addEventListener('click', function(e){ e.stopPropagation(); showTip(!state.showTip); });
+  document.addEventListener('click', function(){ if(state.showTip) showTip(false); });
+  tip.addEventListener('click', function(e){ e.stopPropagation(); });
+
+  /* sidebar collapse toggle */
+  el('sideToggle').addEventListener('click', function(){
+    var collapsed = document.querySelector('.app').classList.toggle('collapsed');
+    this.title = collapsed ? '展开侧边栏' : '收起侧边栏';
+  });
+
+  /* sidebar nav */
+  el('nav').addEventListener('click', function(e){
+    var item = e.target.closest('.nav-item'); if(!item || item.classList.contains('active')) return;
+    if(item.classList.contains('has-sub')){
+      item.classList.toggle('open');
+      var sub = item.nextElementSibling;
+      if(sub && sub.classList.contains('nav-sub')) sub.classList.toggle('show');
+      return;
+    }
+    toast('导航到：'+item.getAttribute('data-title')+'（演示）');
+  });
+
+  /* top tabs：切换选中 + 关闭标签 */
+  el('topTabs').addEventListener('click', function(e){
+    var close = e.target.closest('.tab-close');
+    if(close){
+      e.stopPropagation();
+      var tab = close.closest('.tab');
+      var list = Array.prototype.slice.call(this.querySelectorAll('.tab'));
+      if(list.length<=1){ toast('至少保留一个标签页（演示）'); return; }
+      var idx = list.indexOf(tab);
+      var wasActive = tab.classList.contains('active');
+      var name = tab.getAttribute('data-tab');
+      tab.remove();
+      if(wasActive){
+        var rest = this.querySelectorAll('.tab');
+        var nb = rest[idx] || rest[idx-1] || rest[0];
+        if(nb) nb.classList.add('active');
+      }
+      toast('已关闭标签页：'+name+'（演示）');
+      return;
+    }
+    var b = e.target.closest('.tab'); if(!b) return;
+    this.querySelectorAll('.tab').forEach(function(x){ x.classList.remove('active'); });
+    b.classList.add('active');
+    if(b.getAttribute('data-tab')!=='客单日汇总') toast('切换至「'+b.getAttribute('data-tab')+'」（演示）');
+  });
+
+  /* ---------- init ---------- */
+  renderTable(); renderDonut(); renderBars();
+  /* 若本次加载由刷新按钮触发，加载完成后给出「已刷新」反馈 */
+  try{
+    if(sessionStorage.getItem('__pageRefreshing')){
+      sessionStorage.removeItem('__pageRefreshing');
+      toast('页面已刷新');
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>
